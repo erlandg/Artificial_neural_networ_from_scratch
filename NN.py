@@ -146,15 +146,15 @@ class Multilayer_Perceptron:
                 v_ = v_neg1[:,i]
                 df = self.activation_func(v_, derivative=True)
 
-                if r == 1:
-                    # layer L always with (p, 1) shape, i.e. float objekt
-                    e = y_ - self.y[i]
-
-                else:
+                if r != 1:
                     w_ = new_weights[-1]
                     del_ = deltas[-1]
                     # vector for sum in delta over all combinations to k: j.
                     e = np.sum([del_[i,k] * w_[k,:] for k in range(w_.shape[0])], axis=0)
+
+                else:
+                    # layer L always with (p, 1) shape, i.e. float objekt
+                    e = y_ - self.y[i]
 
                 delta = e*df
                 d_.append(delta)
