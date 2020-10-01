@@ -1,19 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Augmented data vector, (1, x1, x2, cl)
-data = np.array([[1, .1,   -.2, 0],
-                 [1, .2,    .1, 0],
-                 [1, -.15,  .2, 0],
-                 [1, 1.1,   .8, 0],
-                 [1, 1.2,  1.1, 0],
-                 [1, 1.1,  -.1, 1],
-                 [1, 1.25, .15, 1],
-                 [1, .9,    .1, 1],
-                 [1, .1,   1.2, 1],
-                 [1, .2,    .9, 1]]).T
-
-
+# Augmented data vectors, (1, x1, x2, cl)
 N = 100
 cov = np.array([[0.01, 0],
                 [0, 0.01]])
@@ -58,27 +46,27 @@ np.random.shuffle(data.T)
 
 class Multilayer_Perceptron:
     """
+    Creates a multilayer perceptron with any given number of neurons and layers
     """
-    def __init__(self, X, y):
+    def __init__(self, X, y, activation_func = None):
         self.X = X
         self.y = y
         self.N = self.X.shape[1]
-        self.activation_func = self.logistic
+        if activation_func == None: self.activation_func = self.logistic
+        else: self.activation_func = activation_func
         self.weights = []
         self.v_gr = []
         self.y_gr = [self.X.copy()]
-        self.deltas = []
 
 
     def __reset__(self):
         self.v_gr = []
         self.y_gr = [self.X.copy()]
-        self.deltas = []
 
 
     def add_layer(self, neuron_N, scale = 5):
         """
-        Appends a random layer to the model
+        Initiates a random layer to the model
         """
         try:
             l = self.weights[-1].shape[0]
@@ -91,6 +79,7 @@ class Multilayer_Perceptron:
 
     def test(self, testing_data):
         """
+        Tests the classifier on training data
         """
         input = testing_data
         y_ = []
@@ -122,7 +111,9 @@ class Multilayer_Perceptron:
 
     def backwards_propagation(self, mu = 0.1):
         """
-
+        Computes updated weights by backwards propagation.
+        Cost function is defined as the sum of squared errors.
+        Minimum is found by gradient descent.
         """
         deltas = []
         new_weights = []
@@ -158,7 +149,9 @@ class Multilayer_Perceptron:
                 d_.append(delta)
 
             new_weight = np.zeros(weight.shape)
+            # Iterates over neurons j
             for j in range(weight.shape[0]):
+                # weighting change
                 dw_j = - mu * np.sum([d_[i][j] * y_neg2[:,i] for i in range(self.N)], axis=0)
                 new_weight[j] = weight[j] + dw_j
             new_weights.append(new_weight)
@@ -187,6 +180,7 @@ class Multilayer_Perceptron:
         return x_
 
 
+# Design model. Here as a two-layer model with two neurons in the hidden layer
 MP = Multilayer_Perceptron(data[:3, :], data[3, :])
 MP.add_layer(3)
 MP.add_layer(1)
@@ -194,11 +188,11 @@ MP.forward_computation()
 
 
 old = None
-ind = 0
+epoch = 0
 tr_acc = []
 te_acc = []
-while (not np.array_equal(old, MP.weights)) and (ind < 300):
-    ind += 1
+while epoch < 400:
+    epoch += 1
     old = MP.weights
     MP.backwards_propagation()
     MP.forward_computation()
@@ -211,7 +205,7 @@ while (not np.array_equal(old, MP.weights)) and (ind < 300):
     act_y_te = test_data[3, :].astype('int')
     te_acc.append(np.sum(est_y_te == act_y_te)/est_y_te.shape[1])
 
-
+# Accuracy matrices
 L = np.zeros((2,2))
 for n in range(data.shape[1]):
     L[act_y[n], est_y[0,n]] += 1
@@ -227,11 +221,11 @@ print(r'Training data accuracy: %s quantile' % str(tr_acc[-1]))
 print(L_te)
 print(r'Test data accuracy: %s quantile' % str(te_acc[-1]))
 
-
+# Plot of training- and test accuracy as a function of epochs.
 plt.plot(tr_acc, 'r-', label='Accuracy on training data')
 plt.plot(te_acc, 'b-', label='Accuracy on testing data')
 plt.legend()
-plt.ylim(0.4, 1.)
+plt.ylim(0.4, 1.01)
 plt.xlabel('Epochs')
 plt.ylabel('Accuracy')
 plt.show()
