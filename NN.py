@@ -166,7 +166,6 @@ class Multilayer_Perceptron:
                 dw_j = - mu * np.sum([d_[i][j] * y_neg2[:,i] for i in range(self.N)], axis=0)
                 new_weight[j] = weight[j] + dw_j
             new_weights.append(new_weight)
-            if weight.shape != new_weight.shape: print('Old weight must have same dimensions as new')
 
             deltas.append(np.matrix(d_))
         self.weights = new_weights[::-1]
