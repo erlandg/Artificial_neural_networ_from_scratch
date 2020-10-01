@@ -90,7 +90,7 @@ class Multilayer_Perceptron:
 
     def test(self, testing_data):
         """
-        Tests the classifier on training data
+        Tests the classifier on testing data
         """
         input = testing_data
         y_ = []
