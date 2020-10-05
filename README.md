@@ -1,4 +1,4 @@
-# Artificial_neural_networ_from_scratch
+# Artificial_neural_network_from_scratch
 A simple NN classifier built with NumPy.
 Classifies random generated data in a pattern similar to the XOR-problem.
 
