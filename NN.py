@@ -205,7 +205,6 @@ tr_acc = []
 te_acc = []
 while epoch < max_epoch:
     epoch += 1
-    old = MP.weights
     MP.backwards_propagation()
     MP.forward_computation()
 
