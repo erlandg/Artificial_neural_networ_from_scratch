@@ -6,4 +6,4 @@ run in cmd by the following code:
 
 python NN.py
 
-requires only libraries numpy and matplotlib to run.
+only library requirements are numpy and matplotlib
