@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 # Augmented data vectors, (1, x1, x2, cl)
 N = 100
-var = 0.05
+var = 0.1
 cov = np.array([[var, 0],
                 [0, var]])
 m1 = np.array([0., 0.])
@@ -24,11 +24,11 @@ p4 = np.hstack((np.ones([N,1]),
                 np.random.multivariate_normal(m4, cov, size=N),
                 np.ones([N,1])))
 
-plt.subplot(121)
-plt.plot(p1[:,1], p1[:,2], 'r.')
-plt.plot(p2[:,1], p2[:,2], 'r.')
-plt.plot(p3[:,1], p3[:,2], 'b.')
-plt.plot(p4[:,1], p4[:,2], 'b.')
+fig, (ax1, ax2) = plt.subplots(1, 2)
+ax1.plot(p1[:,1], p1[:,2], 'r.')
+ax1.plot(p2[:,1], p2[:,2], 'r.')
+ax1.plot(p3[:,1], p3[:,2], 'b.')
+ax1.plot(p4[:,1], p4[:,2], 'b.')
 
 data = np.vstack((p1, p2, p3, p4)).T
 np.random.shuffle(data.T)
@@ -60,11 +60,13 @@ class Multilayer_Perceptron:
         self.X = X
         self.y = y
         self.N = self.X.shape[1]
-        if activation_func == None: self.activation_func = self.logistic
-        else: self.activation_func = activation_func
+        if activation_func == None:
+            self.activation_func = self.logistic
         self.weights = []
+        self.d_weights = []
         self.v_gr = []
         self.y_gr = [self.X.copy()]
+        self.cost = []
 
 
     def __reset__(self):
@@ -75,7 +77,7 @@ class Multilayer_Perceptron:
         self.y_gr = [self.X.copy()]
 
 
-    def add_layer(self, neuron_N, scale = 5):
+    def add_layer(self, neuron_N, scale = 3):
         """
         Initiates a random layer to the model
         """
@@ -86,20 +88,27 @@ class Multilayer_Perceptron:
 
         weights = scale*(np.random.random((neuron_N, l)) - 1/2)
         self.weights.append(weights)
+        # Zero start momentum
+        self.d_weights.append(np.zeros(weights.shape))
 
 
-    def test(self, testing_data):
+    def test(self, testing_data, y_if_cost = None):
         """
-        Tests the classifier on testing data
+        Tests the classifier on training data
+        returns: output (N_te,), cost = (1,)
         """
         input = testing_data
         y_ = []
         for j in range(len(self.weights)):
             v = self.weights[j] @ input
-            y = self.activation_func(v)
-            input = y
-            y_.append(y)
-        return y_[-1]
+            input = self.activation_func(v)
+            y_.append(input)
+
+        if np.sum(y_if_cost) != None:
+            # Calculate cost function of the test data
+            cost = 1/2*np.sum((y_[-1] - y_if_cost)**2)
+            return y_[-1], cost
+        else: return y_[-1]
 
 
     def forward_computation(self):
@@ -119,19 +128,24 @@ class Multilayer_Perceptron:
             self.v_gr.append(v)
             self.y_gr.append(self.activation_func(v))
 
+        self.cost.append(1/2*np.sum((self.y_gr[-1] - self.y)**2))
 
-    def backwards_propagation(self, mu = 0.1):
+
+    def backwards_propagation(self, mu = 0.1, momentum=0.7):
         """
         Computes updated weights by backwards propagation.
-        Cost function is defined as the sum of squared errors.
+        Cost function is defined as the sum of squared errors default (SSE).
+        May also use cross entropy (CE) as cost function.
         Minimum is found by gradient descent.
         """
         deltas = []
         new_weights = []
+        new_d_weights = []
         for r in range(1, len(self.weights)+1):
             # Iteration over layers from L to 1
 
             weight = np.array(self.weights[-r])
+            old_d_w = np.array(self.d_weights[-r])
             # Shape (p, N)
             y_neg1 = self.y_gr[-r]
             v_neg1 = self.v_gr[-r]
@@ -160,19 +174,29 @@ class Multilayer_Perceptron:
                 d_.append(delta)
 
             new_weight = np.zeros(weight.shape)
+            new_d_weight = np.zeros(weight.shape)
             # Iterates over neurons j
             for j in range(weight.shape[0]):
-                # weighting change
-                dw_j = - mu * np.sum([d_[i][j] * y_neg2[:,i] for i in range(self.N)], axis=0)
+                # weighting change with momentum
+                dw_j = momentum * old_d_w[j] - mu * np.sum([d_[i][j] * y_neg2[:,i] for i in range(self.N)], axis=0)
+                new_d_weight[j] = dw_j
                 new_weight[j] = weight[j] + dw_j
+            # Update weights for given layer
             new_weights.append(new_weight)
+            new_d_weights.append(new_d_weight)
 
             deltas.append(np.matrix(d_))
+        # Update final weights and final weighting change
         self.weights = new_weights[::-1]
+        self.d_weights = new_d_weights[::-1]
+        # Ready for next computation
         self.__reset__()
 
 
     def logistic(self, x, a=1, derivative = False):
+        """
+        Our activation function of choice.
+        """
         f = 1/(1 + np.exp(-a*x))
         if not derivative:
             return f
@@ -180,18 +204,8 @@ class Multilayer_Perceptron:
             return np.exp(-a*x) * f**2
 
 
-    def ReLU(self, x, derivative = False):
-        x_ = x.copy()
-        if not derivative:
-            x_[x < 0] = 0
-        else:
-            x_[x > 0] = 1
-            x_[x < 0] = 0
-        return x_
-
 
 # Design model. Here as a two-layer model with two neurons in the hidden layer
-# +1 pga augmented vectors.
 MP = Multilayer_Perceptron(data[:3, :], data[3, :])
 MP.add_layer(3)
 MP.add_layer(1)
@@ -203,18 +217,25 @@ max_epoch = 200
 epoch = 0
 tr_acc = []
 te_acc = []
+# Progress of cost function
+te_cost = []
 while epoch < max_epoch:
     epoch += 1
+    old = MP.weights
+    # Update weights
     MP.backwards_propagation()
+    # New results
     MP.forward_computation()
 
     est_y = np.round(MP.y_gr[-1]).astype('int')
     act_y = MP.y.astype('int')
     tr_acc.append(np.sum(est_y == act_y)/est_y.shape[1])
 
-    est_y_te = np.round(MP.test(test_data[:3, :])).astype('int')
+    est_y_te, test_cost = MP.test(test_data[:3, :], test_data[3, :])
+    est_y_te = np.round(est_y_te).astype('int')
     act_y_te = test_data[3, :].astype('int')
     te_acc.append(np.sum(est_y_te == act_y_te)/est_y_te.shape[1])
+    te_cost.append(test_cost)
 
 
 # Accuracy matrices
@@ -234,11 +255,17 @@ print(r'Test data accuracy: %s quantile' % str(te_acc[-1]))
 
 
 # Plot of training- and test accuracy as a function of epochs.
-plt.subplot(122)
-plt.plot(tr_acc, 'r-', label='Accuracy on training data')
-plt.plot(te_acc, 'b-', label='Accuracy on testing data')
-plt.legend()
-plt.ylim(0.4, 1.01)
-plt.xlabel('Epochs')
-plt.ylabel('Accuracy')
+ax22 = ax2.twinx()
+ax2.plot(tr_acc, 'r-', label='Accuracy on training data')
+ax2.plot(te_acc, 'b-', label='Accuracy on testing data')
+ax2.set_ylim(0.4, 1.01)
+ax2.set_xlabel('Epochs')
+ax2.set_ylabel('Accuracy')
+
+ax22.plot(MP.cost, 'g-', label='Training data cost function')
+ax22.plot(te_cost, 'purple', label='Testing data cost')
+ax22.set_ylabel('Cost function')
+
+fig.subplots_adjust(bottom=0.2)
+fig.legend(loc='lower right')
 plt.show()
